@@ -8,17 +8,29 @@ output: github_document
 ```{r}
 library(p8105.datasets)
 library(tidyverse)
+library(patchwork)
+library(ggridges)
 data("instacart")
 data("brfss_smart2010")
 ```
 
 ## Problem 1
 
+### First, putting the data into a tibble
+```{r}
+
+instacart = 
+  instacart |> 
+  as_tibble()
+
+```
+
+
 ```{r}
 
 df_aisles = 
   instacart |> 
-  group_by(aisle_id) |> 
+  group_by(aisle) |> 
   summarise(n_aisle = n()) |> 
   arrange(desc(n_aisle))
 
@@ -28,18 +40,45 @@ df_aisles
 Using the `group_by()` function and the `summarise()` function, we see that there are 134 different aisles. Further, using `arrange()`, we can see that 83, 24,123,120,21 are the 5 most ordered-from aisles.
 
 ```{r}
-df_aisles |> 
-  filter(n_aisle > 10000) |> 
-  ggplot(aes(x = aisle_id, y = n_aisle)) +
-  geom_point()
+instacart |> 
+  count(aisle) |> 
+  filter(n > 10000) |> 
+  mutate(aisle = fct_reorder(aisle, n)) |> 
+  ggplot(aes(x = aisle, y = n, color = aisle)) + 
+  geom_point() + 
+  labs(title = "Number of items purchased per aisle",
+       x = "Response",
+       y = "Data Value") + 
+  theme(axis.text.x = element_text(size = 5)) +
+  theme(axis.text.x = element_text(angle = 40, hjust = 1)) +
+  guides(color = FALSE)
+```
+
+
+```{r}
+
+# I did this one very wrong the first go around, I pretty much got just to the mutate step, I corrected it based on the lecture notes
+instacart |> 
+  filter(aisle %in% c("baking ingredients", "dog food care", "packaged vegetables fruits")) |>
+  group_by(aisle) |> 
+  count(product_name) |> 
+  mutate(rank = min_rank(desc(n))) |> 
+  filter(rank < 4) |> 
+  arrange(desc(n)) |>
+  knitr::kable()
 
 ```
 
 
 ```{r}
-df_bi_dfc_pvf = 
-  instacart |> 
-  filter(aisle == "baking ingredients", aisle == "dog food care", aisle == "packaged_vegetable_fruits")
+instacart |>
+  filter(product_name %in% c("Pink Lady Apples", "Coffee Ice Cream")) |>
+  group_by(product_name, order_dow) |>
+  summarize(mean_hour = mean(order_hour_of_day)) |>
+  pivot_wider(
+    names_from = order_dow, 
+    values_from = mean_hour) |>
+  knitr::kable(digits = 2)
 ```
 
 
@@ -55,7 +94,7 @@ df_brfss =
          state_county = locationdesc) |> 
   filter(topic == "Overall Health") |> 
   filter(response %in% c("Excellent", "Fair", "Very good", "Good", "Poor")) |> 
-    mutate(response = factor(response, levels = c("Excellent", "Very good", "Good", "Fair", "Poor"), ordered = TRUE))
+  mutate(response = factor(response, levels = c("Excellent", "Very good", "Good", "Fair", "Poor"), ordered = TRUE))
 ```
 
 Here I make a dataframe called `df_brfss` so that I do not alter the original dataframe. I used `clean_names()` to tidy the variable names, but I also had to use the `rename()` function on `locationabbr` and `locationdesc` since their names were not intuitive and difficult to read. I used the `filter()` function two times, once to filter only the `Overall Health` topic and the other to filter the specified `responses`. Finally, I made response into a factor variable with levels Excellent - Poor in descending order using `mutate()`.
@@ -87,8 +126,7 @@ I interpreted this question as looking for the number of states (`state_abbr`) t
 ### Construct a dataset that is limited to Excellent responses, and contains, year, state, and a variable that averages the data_value across locations within a state. Make a “spaghetti” plot of this average value over time within a state (that is, make a plot showing a line for each state across years – the geom_line geometry and group aesthetic will help).
 
 ```{r}
-df_exc_resp = 
-  df_brfss |> 
+df_brfss |> 
   filter(response == 'Excellent') |> 
   group_by(year, state_abbr) |> 
   summarise(avg_dv_pct = mean(data_value)) |> 
@@ -98,16 +136,20 @@ df_exc_resp =
   labs(title = "Average Data Value of Excellent Responses Over Years by State",
        x = "Year",
        y = "Average Data Value (%)") +
-  theme_minimal() +
-  theme(legend.position = "right")
+  theme(legend.position = "right") +
+  theme(legend.key.size = unit(1, 'cm'),
+        legend.key.height = unit(0.5, 'cm'), 
+        legend.key.width = unit(0.5, 'cm'), 
+        legend.title = element_text(size=7),
+        legend.text = element_text(size=7)) +
+  scale_color_discrete(name="")
 
 ```
 
 ### Make a two-panel plot showing, for the years 2006, and 2010, distribution of data_value for responses (“Poor” to “Excellent”) among locations in NY State.
 
 ```{r}
-plot_dv_2006_2010 =
-  df_brfss |> 
+df_brfss |> 
   filter(year %in% c(2006, 2010), 
          state_abbr == "NY", 
          response %in% c("Poor", "Fair", "Good", "Very good", "Excellent")) |> 
@@ -117,16 +159,92 @@ plot_dv_2006_2010 =
   facet_grid(~year) +
   labs(title = "Data Value for Poor-Excellent Responses in NY State",
        x = "Response",
-       y = "Data Value")
-
-plot_dv_2006_2010
+       y = "Data Value") +
+  theme(axis.text.x = element_text(size = 7)) +
+  theme(axis.text.x = element_text(angle = 30, hjust = 1)) +
+    theme(legend.position = "right") +
+  theme(legend.key.size = unit(0.5, 'cm'),
+        legend.key.height = unit(0.5, 'cm'), 
+        legend.key.width = unit(0.5, 'cm'), 
+        legend.title = element_text(size=7),
+        legend.text = element_text(size=7))
 ```
 
 
 ## Problem 3
 
+### Load, tidy, merge, and otherwise organize the data sets. Your final dataset should include all originally observed variables; exclude participants less than 21 years of age, and those with missing demographic data; and encode data with reasonable variable classes (i.e. not numeric, and using factors with the ordering of tables and plots in mind).
+
+
+
+```{r}
+df_covar = 
+  read_csv("data/nhanes_covar.csv", skip = 4) |> 
+  janitor::clean_names() |> 
+  mutate(sex = 
+           case_match(sex,
+                      1 ~ "male",
+                      2 ~ "female")) |> 
+  mutate(education = 
+           case_match(education,
+                      1 ~ "less_than_hs",
+                      2 ~ "equivalent_hs",
+                      3 ~ "more_than_hs")) |>
+  mutate(education = factor(education, levels = c("less_than_hs", 
+                                                  "equivalent_hs", 
+                                                  "more_than_hs"), 
+                                                  ordered = TRUE)) |> 
+  filter(age >= 21) |> 
+  drop_na(sex, age, bmi, education)
+
+df_accel = 
+  read_csv("data/nhanes_accel.csv") |> 
+  janitor::clean_names() |> 
+  pivot_longer(min1:min1440, names_to = "time_interval")
+
+
+df_merged =
+  inner_join(df_accel, df_covar)
+
+```
+
+### Produce a reader-friendly table for the number of men and women in each education category, and create a visualization of the age distributions for men and women in each education category. Comment on these items.
+
+```{r}
+ df_merged |> 
+  group_by(sex, education) |> 
+  summarise(count = n()) |> 
+  arrange(sex, education) |> 
+  knitr::kable()
+
+```
+
+
+```{r}
+df_merged |> 
+  ggplot(aes(x = education, fill = sex)) +
+  facet_grid(~sex) +
+  geom_bar() +
+    labs(title = "Education Level by Sex",
+       x = "Education Level",
+       y = "# of Individuals") +
+  theme(axis.text.x = element_text(size = 5)) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1)) +
+  scale_x_discrete(labels = c(equivalent_hs = "High School Equivalent", "less_than_hs" = "Less than High School", "more_than_hs" = "More than High School"))
+
+```
+
+### Traditional analyses of accelerometer data focus on the total activity over the day. Using your tidied dataset, aggregate across minutes to create a total activity variable for each participant. Plot these total activities (y-axis) against age (x-axis); your plot should compare men to women and have separate panels for each education level. Include a trend line or a smooth to illustrate differences. Comment on your plot.
+
+
 ```{r}
 
 ```
+
+
+### Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
+
+
+
 
 
