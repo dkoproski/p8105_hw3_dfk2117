@@ -199,12 +199,11 @@ df_covar =
 
 df_accel = 
   read_csv("data/nhanes_accel.csv") |> 
-  janitor::clean_names() |> 
-  pivot_longer(min1:min1440, names_to = "time_interval")
-
+  janitor::clean_names()
 
 df_merged =
-  inner_join(df_accel, df_covar)
+  inner_join(df_accel, df_covar) 
+
 
 ```
 
@@ -238,11 +237,37 @@ df_merged |>
 
 
 ```{r}
+## I found the basis for the code used in the mutate() function on stack overflow since I could not find a way to do this from my notes
+df_merged |> 
+  group_by(seqn) |> 
+  mutate(total_activity = 
+           sum(
+             across(
+               starts_with("min")))) |>
+  ggplot(aes(x = age, y = total_activity, color = sex)) + 
+  geom_point(aes(shape = sex), alpha=0.6) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~education, scales = "free") +
+  labs(title = "Total Activity by Age in each Education Level", x = "Age (years)", y = "Total Activity") 
 
 ```
 
+Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
 
-### Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
+```{r}
+df_merged |> 
+  pivot_longer(min1:min1440, names_to = "time_interval", values_to = "activity") |> 
+  group_by(seqn) |> 
+  ggplot(aes(x = minute, y = activity, color = sex)) +
+  geom_line(alpha = 0.5) + 
+  geom_smooth(se = FALSE, method = "lm") +  
+  facet_wrap(~education, ncol = 1) +  
+  labs(title = "24-hour Activity Time Courses by Education Level",
+       x = "Minute of the Day",
+       y = "Activity Level",
+       color = "Sex")
+```
+
 
 
 
