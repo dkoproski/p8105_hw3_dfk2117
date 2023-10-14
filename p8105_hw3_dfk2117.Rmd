@@ -215,7 +215,7 @@ df_accel =
   read_csv("data/nhanes_accel.csv") |> 
   janitor::clean_names()
 
-df_merged =
+df_nhanes =
   inner_join(df_accel, df_covar) 
 
 
@@ -226,7 +226,7 @@ My first step in tidying the data is to `read_csv()` with the `skip = 4` argumen
 ### Produce a reader-friendly table for the number of men and women in each education category, and create a visualization of the age distributions for men and women in each education category. Comment on these items.
 
 ```{r}
- df_merged |> 
+ df_nhanes |> 
   group_by(sex, education) |> 
   summarise(count = n()) |> 
   knitr::kable()
@@ -236,7 +236,7 @@ My first step in tidying the data is to `read_csv()` with the `skip = 4` argumen
 This creates a table with the counts of each education level within each sex. Then `knitr::kable()` makes the table more readable.
 
 ```{r}
-df_merged |> 
+df_nhanes |> 
   ggplot(aes(x = education, fill = sex)) +
   geom_bar() +
     labs(
@@ -256,7 +256,7 @@ This makes a `geom_bar()` plot with x as education and colored by sex. This plot
 
 
 ```{r}
-df_merged |> 
+df_nhanes |> 
   group_by(seqn) |> 
   mutate(total_activity = 
            sum(
@@ -275,10 +275,15 @@ I had some trouble getting this one to work properly, but ultimately my main iss
 ### Accelerometer data allows the inspection activity over the course of the day. Make a three-panel plot that shows the 24-hour activity time courses for each education level and use color to indicate sex. Describe in words any patterns or conclusions you can make based on this graph; including smooth trends may help identify differences.
 
 ```{r}
-
+df_nhanes |> 
+  pivot_longer(min1:min1440, names_to = "minute", values_to = "activity") |> 
+  mutate(minute = as.numeric(str_replace(minute, "min", ""))) |> 
+  ggplot(aes(x = minute, y = activity, color = sex)) +
+  geom_point() +
+  facet_wrap(~education)
 ```
 
-
+In order to make this plot, I used `pivot_longer()` to make one minute variable with corresponding activity values for each minute. I then used `mutate()`, `as.numeric()` and `str_replace()` in order to convert the minute variable into a number from 1 to 1500. I then plotted it using `geom_point()` and applied a trend line using `geom_smooth()`. Lastly, I used `facet_wrap()` to make separate plots for each education level. Overall, it seems that individuals with less than high school or the high school equivalent have less activity than more than high school individuals. Those with more than high school have two peaks in activity throughout the day, one near the beginning of data collection and one at the end of data collection.
 
 
 
